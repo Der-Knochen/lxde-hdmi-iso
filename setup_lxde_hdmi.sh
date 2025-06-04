@@ -1,5 +1,5 @@
 #!/bin/bash
-# Debian LXDE HDMI ISO Builder Script (Final: Mirror-Fix via config/archives/*.list.chroot)
+# Debian LXDE HDMI ISO Builder Script (mit Cleanup-Hook gegen Ubuntu-APT und Mirror-Duplikate)
 
 # 1. Konfiguration
 ISO_NAME="debian-lxde-hdmi.iso"
@@ -20,7 +20,7 @@ lb config --distribution bookworm \
   --mirror-bootstrap http://deb.debian.org/debian \
   --mirror-chroot http://deb.debian.org/debian
 
-# 4. Debian Mirror global über config/archives setzen (robuster als includes.chroot/etc/apt/)
+# 4. Debian Mirror über config/archives setzen
 mkdir -p config/archives
 cat <<EOF > config/archives/debian.list.chroot
 deb http://deb.debian.org/debian bookworm main contrib non-free-firmware
@@ -28,7 +28,16 @@ deb http://deb.debian.org/debian bookworm-updates main contrib non-free-firmware
 deb http://security.debian.org bookworm-security main contrib non-free-firmware
 EOF
 
-# 5. Hook für Passwortsetzung
+# 5. Cleanup-Hook: Entferne Ubuntu-Apt-Quellen
+mkdir -p config/hooks/normal
+cat << 'EOF' > config/hooks/normal/10-clean-apt.chroot
+#!/bin/bash
+rm -f /etc/apt/sources.list
+rm -f /etc/apt/sources.list.d/*
+EOF
+chmod +x config/hooks/normal/10-clean-apt.chroot
+
+# 6. Passwort-Hook (Late Execution)
 mkdir -p config/hooks/live/late-command
 cat << 'EOF' > config/hooks/live/late-command/99-passwords.chroot
 #!/bin/bash
@@ -38,13 +47,13 @@ usermod -aG sudo asus
 EOF
 chmod +x config/hooks/live/late-command/99-passwords.chroot
 
-# 6. SSH aktivieren
+# 7. SSH aktivieren
 mkdir -p config/includes.chroot/etc/systemd/system/multi-user.target.wants
 if [ ! -e config/includes.chroot/etc/systemd/system/multi-user.target.wants/ssh.service ]; then
   ln -s /lib/systemd/system/ssh.service config/includes.chroot/etc/systemd/system/multi-user.target.wants/ssh.service
 fi
 
-# 7. Paketliste
+# 8. Paketliste
 mkdir -p config/package-lists
 cat <<EOF > config/package-lists/hdmi.list.chroot
 lxde
@@ -61,7 +70,7 @@ debian-archive-keyring
 coreutils
 EOF
 
-# 8. Autologin einrichten
+# 9. Autologin einrichten
 mkdir -p config/includes.chroot/etc/systemd/system/getty@tty1.service.d
 cat <<EOF > config/includes.chroot/etc/systemd/system/getty@tty1.service.d/autologin.conf
 [Service]
@@ -69,10 +78,10 @@ ExecStart=
 ExecStart=-/sbin/agetty --autologin asus --noclear %I \$TERM
 EOF
 
-# 9. ISO bauen
+# 10. ISO bauen
 sudo lb build
 
-# 10. Ergebnis
+# 11. Ergebnis
 if [ -f "$ISO_NAME" ]; then
   echo -e "\n✅ ISO erstellt: $(realpath $ISO_NAME)"
 else
