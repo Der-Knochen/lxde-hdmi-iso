@@ -1,0 +1,33 @@
+name: Build Debian LXDE HDMI ISO
+
+on:
+  push:
+    paths:
+      - '**.sh'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-latest
+    name: Build Live ISO
+    steps:
+      - name: 🧾 Repository klonen
+        uses: actions/checkout@v3
+
+      - name: ⚙️ Abhängigkeiten installieren
+        run: |
+          sudo apt update
+          sudo apt install -y live-build curl xorriso squashfs-tools uuid-runtime calamares
+
+      - name: 🛠️ Setup-Skript ausführen
+        run: |
+          chmod +x setup_lxde_hdmi.sh
+          ./setup_lxde_hdmi.sh
+
+      - name: 📦 ISO als Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-lxde-hdmi.iso
+          path: ~/debian-lxde-hdmi-iso/debian-lxde-hdmi.iso
+
