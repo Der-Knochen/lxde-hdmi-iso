@@ -1,5 +1,5 @@
 #!/bin/bash
-# Debian LXDE HDMI ISO Builder Script
+# Debian LXDE HDMI ISO Builder Script (Fix: /usr/bin/env Problem im Chroot)
 
 # 1. Konfiguration
 ISO_NAME="debian-lxde-hdmi.iso"
@@ -25,7 +25,7 @@ EOF
 # 5. Benutzer und Passwort setzen
 mkdir -p config/includes.chroot/usr/lib/live/config
 cat << 'EOF' > config/includes.chroot/usr/lib/live/config/999-set-passwords
-#!/bin/sh
+#!/bin/bash
 echo "asus:root" | chpasswd
 echo "root:root" | chpasswd
 usermod -aG sudo asus
@@ -54,9 +54,18 @@ sudo
 calamares
 debian-archive-keyring
 coreutils
+busybox
 EOF
 
-# 8. Autologin einrichten
+# 8. /usr/bin/env Fix für Chroot vor dem Paketmanager
+mkdir -p config/includes.chroot/usr/bin
+cat <<EOF > config/includes.chroot/usr/bin/env
+#!/bin/sh
+exec /bin/busybox env "$@"
+EOF
+chmod +x config/includes.chroot/usr/bin/env
+
+# 9. Autologin einrichten
 mkdir -p config/includes.chroot/etc/systemd/system/getty@tty1.service.d
 cat <<EOF > config/includes.chroot/etc/systemd/system/getty@tty1.service.d/autologin.conf
 [Service]
@@ -64,13 +73,12 @@ ExecStart=
 ExecStart=-/sbin/agetty --autologin asus --noclear %I \$TERM
 EOF
 
-# 9. ISO bauen
+# 10. ISO bauen
 sudo lb build
 
-# 10. Ergebnis
+# 11. Ergebnis
 if [ -f "$ISO_NAME" ]; then
-  echo -e "\\n✅ ISO erstellt: $(realpath $ISO_NAME)"
+  echo -e "\n✅ ISO erstellt: $(realpath $ISO_NAME)"
 else
-  echo -e "\\n❌ Fehler: ISO wurde nicht erstellt."
+  echo -e "\n❌ Fehler: ISO wurde nicht erstellt."
 fi
-
