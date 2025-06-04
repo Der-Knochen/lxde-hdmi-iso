@@ -1,5 +1,5 @@
 #!/bin/bash
-# Debian LXDE HDMI ISO Builder Script (Final + Mirror-Fix)
+# Debian LXDE HDMI ISO Builder Script (Final: Mirror-Fix via config/archives/*.list.chroot)
 
 # 1. Konfiguration
 ISO_NAME="debian-lxde-hdmi.iso"
@@ -20,15 +20,15 @@ lb config --distribution bookworm \
   --mirror-bootstrap http://deb.debian.org/debian \
   --mirror-chroot http://deb.debian.org/debian
 
-# 4. APT-Quellen setzen
-mkdir -p config/includes.chroot/etc/apt
-cat <<EOF > config/includes.chroot/etc/apt/sources.list
+# 4. Debian Mirror global über config/archives setzen (robuster als includes.chroot/etc/apt/)
+mkdir -p config/archives
+cat <<EOF > config/archives/debian.list.chroot
 deb http://deb.debian.org/debian bookworm main contrib non-free-firmware
 deb http://deb.debian.org/debian bookworm-updates main contrib non-free-firmware
 deb http://security.debian.org bookworm-security main contrib non-free-firmware
 EOF
 
-# 5. Hook für Passwortsetzung (später im Build ausgeführt)
+# 5. Hook für Passwortsetzung
 mkdir -p config/hooks/live/late-command
 cat << 'EOF' > config/hooks/live/late-command/99-passwords.chroot
 #!/bin/bash
