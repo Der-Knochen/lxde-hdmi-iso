@@ -1,5 +1,5 @@
 #!/bin/bash
-# Debian LXDE HDMI ISO Builder Script (Fix: /usr/bin/env Problem im Chroot)
+# Debian LXDE HDMI ISO Builder Script (Final + Mirror-Fix)
 
 # 1. Konfiguration
 ISO_NAME="debian-lxde-hdmi.iso"
@@ -11,8 +11,14 @@ cd "$BUILD_DIR"
 sudo apt update
 sudo apt install -y live-build curl xorriso squashfs-tools uuid-runtime calamares
 
-# 3. Konfiguration starten
-lb config --distribution bookworm --debian-installer false --archive-areas "main contrib non-free-firmware" --binary-images iso-hybrid --bootappend-live "boot=live components quiet splash username=asus hostname=hdmi locales=de_DE.UTF-8 keyboard-layouts=de timezone=Europe/Berlin"
+# 3. Live-Build Konfiguration mit Debian-Mirror
+lb config --distribution bookworm \
+  --debian-installer false \
+  --archive-areas "main contrib non-free-firmware" \
+  --binary-images iso-hybrid \
+  --bootappend-live "boot=live components quiet splash username=asus hostname=hdmi locales=de_DE.UTF-8 keyboard-layouts=de timezone=Europe/Berlin" \
+  --mirror-bootstrap http://deb.debian.org/debian \
+  --mirror-chroot http://deb.debian.org/debian
 
 # 4. APT-Quellen setzen
 mkdir -p config/includes.chroot/etc/apt
@@ -22,16 +28,15 @@ deb http://deb.debian.org/debian bookworm-updates main contrib non-free-firmware
 deb http://security.debian.org bookworm-security main contrib non-free-firmware
 EOF
 
-# 5. Benutzer und Passwort setzen
-mkdir -p config/includes.chroot/usr/lib/live/config
-cat << 'EOF' > config/includes.chroot/usr/lib/live/config/999-set-passwords
+# 5. Hook für Passwortsetzung (später im Build ausgeführt)
+mkdir -p config/hooks/live/late-command
+cat << 'EOF' > config/hooks/live/late-command/99-passwords.chroot
 #!/bin/bash
 echo "asus:root" | chpasswd
 echo "root:root" | chpasswd
 usermod -aG sudo asus
-rm -f /usr/lib/live/config/999-set-passwords
 EOF
-chmod +x config/includes.chroot/usr/lib/live/config/999-set-passwords
+chmod +x config/hooks/live/late-command/99-passwords.chroot
 
 # 6. SSH aktivieren
 mkdir -p config/includes.chroot/etc/systemd/system/multi-user.target.wants
@@ -54,18 +59,9 @@ sudo
 calamares
 debian-archive-keyring
 coreutils
-busybox
 EOF
 
-# 8. /usr/bin/env Fix für Chroot vor dem Paketmanager
-mkdir -p config/includes.chroot/usr/bin
-cat <<EOF > config/includes.chroot/usr/bin/env
-#!/bin/sh
-exec /bin/busybox env "$@"
-EOF
-chmod +x config/includes.chroot/usr/bin/env
-
-# 9. Autologin einrichten
+# 8. Autologin einrichten
 mkdir -p config/includes.chroot/etc/systemd/system/getty@tty1.service.d
 cat <<EOF > config/includes.chroot/etc/systemd/system/getty@tty1.service.d/autologin.conf
 [Service]
@@ -73,10 +69,10 @@ ExecStart=
 ExecStart=-/sbin/agetty --autologin asus --noclear %I \$TERM
 EOF
 
-# 10. ISO bauen
+# 9. ISO bauen
 sudo lb build
 
-# 11. Ergebnis
+# 10. Ergebnis
 if [ -f "$ISO_NAME" ]; then
   echo -e "\n✅ ISO erstellt: $(realpath $ISO_NAME)"
 else
